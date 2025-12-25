@@ -27,20 +27,15 @@ private:
         std::string label;
     };
 
-    struct OptionRow {
-        std::string label;
-        std::string value;
-    };
-
     enum class Screen {
         MainMenu,
-        CreateWorldMenu
+        CreateWorldPlaceholder
     };
 
     void handleMainMenuEvent(const SDL_Event& event, bool& running);
-    void handleCreateWorldEvent(const SDL_Event& event, bool& running);
+    void handlePlaceholderEvent(const SDL_Event& event, bool& running);
     void renderMainMenu();
-    void renderCreateWorldMenu();
+    void renderPlaceholder();
     void drawButton(const Button& button, bool hovered);
     void drawText(const std::string& text, int x, int y, int scale, SDL_Color color);
     const std::array<std::string, 7>& glyphForChar(char c) const;
@@ -51,6 +46,4 @@ private:
     int height_;
     Screen screen_;
     std::vector<Button> mainMenuButtons_;
-    std::vector<Button> createWorldButtons_;
-    std::vector<OptionRow> worldOptions_;
 };

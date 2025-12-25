@@ -41,17 +41,6 @@ const std::unordered_map<char, Glyph> FONT = {
     {'X', {"10001", "10001", "01010", "00100", "01010", "10001", "10001"}},
     {'Y', {"10001", "10001", "01010", "00100", "00100", "00100", "00100"}},
     {'Z', {"11111", "00001", "00010", "00100", "01000", "10000", "11111"}},
-    {'0', {"01110", "10001", "10011", "10101", "11001", "10001", "01110"}},
-    {'1', {"00100", "01100", "00100", "00100", "00100", "00100", "01110"}},
-    {'2', {"01110", "10001", "00001", "00010", "00100", "01000", "11111"}},
-    {'3', {"11110", "00001", "00001", "01110", "00001", "00001", "11110"}},
-    {'4', {"00010", "00110", "01010", "10010", "11111", "00010", "00010"}},
-    {'5', {"11111", "10000", "11110", "00001", "00001", "10001", "01110"}},
-    {'6', {"01110", "10000", "11110", "10001", "10001", "10001", "01110"}},
-    {'7', {"11111", "00001", "00010", "00100", "01000", "01000", "01000"}},
-    {'8', {"01110", "10001", "10001", "01110", "10001", "10001", "01110"}},
-    {'9', {"01110", "10001", "10001", "01111", "00001", "00001", "01110"}},
-    {'-', {"00000", "00000", "00000", "11111", "00000", "00000", "00000"}},
     {' ', {"00000", "00000", "00000", "00000", "00000", "00000", "00000"}},
 };
 }
@@ -100,17 +89,6 @@ bool Game::initialize(const std::string& title, int width, int height) {
 
     mainMenuButtons_.push_back({SDL_Rect{centerX, startY, buttonWidth, buttonHeight}, "CREATE NEW WORLD"});
     mainMenuButtons_.push_back({SDL_Rect{centerX, startY + buttonHeight + spacing, buttonWidth, buttonHeight}, "QUIT"});
-
-    createWorldButtons_.push_back({SDL_Rect{40, height_ - 100, 180, 50}, "BACK"});
-
-    worldOptions_ = {
-        {"WORLD MAP SIZE", "128 X 128"},
-        {"NUMBER OF CIVILIZATIONS", "8"},
-        {"NUMBER OF SITES", "32"},
-        {"NUMBER OF DUNGEONS", "6"},
-        {"NATURAL SAVAGERY", "MEDIUM"},
-        {"MINERAL OCCURRENCE", "ABUNDANT"},
-    };
     return true;
 }
 
@@ -153,8 +131,8 @@ void Game::processEvents(bool& running) {
         case Screen::MainMenu:
             handleMainMenuEvent(event, running);
             break;
-        case Screen::CreateWorldMenu:
-            handleCreateWorldEvent(event, running);
+        case Screen::CreateWorldPlaceholder:
+            handlePlaceholderEvent(event, running);
             break;
         }
     }
@@ -174,8 +152,8 @@ void Game::render() {
     case Screen::MainMenu:
         renderMainMenu();
         break;
-    case Screen::CreateWorldMenu:
-        renderCreateWorldMenu();
+    case Screen::CreateWorldPlaceholder:
+        renderPlaceholder();
         break;
     }
 
@@ -205,34 +183,22 @@ void Game::handleMainMenuEvent(const SDL_Event& event, bool& running) {
                 if (button.label == "QUIT") {
                     running = false;
                 } else if (button.label == "CREATE NEW WORLD") {
-                    screen_ = Screen::CreateWorldMenu;
+                    screen_ = Screen::CreateWorldPlaceholder;
                 }
             }
         }
     }
 }
 
-void Game::handleCreateWorldEvent(const SDL_Event& event, bool& running) {
-    if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-        screen_ = Screen::MainMenu;
-        return;
-    }
-
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        const int mouseX = event.button.x;
-        const int mouseY = event.button.y;
-        for (const auto& button : createWorldButtons_) {
-            const bool inside = mouseX >= button.bounds.x && mouseX <= button.bounds.x + button.bounds.w &&
-                                mouseY >= button.bounds.y && mouseY <= button.bounds.y + button.bounds.h;
-            if (inside) {
-                if (button.label == "BACK") {
-                    screen_ = Screen::MainMenu;
-                }
-            }
+void Game::handlePlaceholderEvent(const SDL_Event& event, bool& running) {
+    if (event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.sym == SDLK_ESCAPE) {
+            screen_ = Screen::MainMenu;
         }
-    }
-
-    if (event.type == SDL_QUIT) {
+    } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        // Clicking anywhere returns to the main menu for now.
+        screen_ = Screen::MainMenu;
+    } else if (event.type == SDL_QUIT) {
         running = false;
     }
 }
@@ -259,38 +225,10 @@ void Game::renderMainMenu() {
     }
 }
 
-void Game::renderCreateWorldMenu() {
-    SDL_Color accent{140, 120, 190, 255};
-    SDL_Color textColor{230, 225, 240, 255};
-
-    const int titleScale = 3;
-    const int titleWidth = static_cast<int>("CREATE NEW WORLD"s.size()) * (5 * titleScale + 1) - 1;
-    const int titleX = width_ / 2 - titleWidth / 2;
-    const int titleY = 60;
-    drawText("CREATE NEW WORLD", titleX, titleY, titleScale, accent);
-
-    const int optionLabelX = 120;
-    const int optionValueX = width_ - 240;
-    const int optionStartY = 150;
-    const int optionSpacing = 50;
-    const int labelScale = 2;
-    const int valueScale = 2;
-
-    for (std::size_t i = 0; i < worldOptions_.size(); ++i) {
-        const int rowY = optionStartY + static_cast<int>(i) * optionSpacing;
-        drawText(worldOptions_[i].label, optionLabelX, rowY, labelScale, textColor);
-        const int valueWidth = static_cast<int>(worldOptions_[i].value.size()) * (5 * valueScale + 1) - 1;
-        drawText(worldOptions_[i].value, optionValueX - valueWidth / 2, rowY, valueScale, accent);
-    }
-
-    int mouseX = 0;
-    int mouseY = 0;
-    SDL_GetMouseState(&mouseX, &mouseY);
-    for (const auto& button : createWorldButtons_) {
-        const bool hovered = mouseX >= button.bounds.x && mouseX <= button.bounds.x + button.bounds.w &&
-                             mouseY >= button.bounds.y && mouseY <= button.bounds.y + button.bounds.h;
-        drawButton(button, hovered);
-    }
+void Game::renderPlaceholder() {
+    SDL_Color textColor{220, 210, 240, 255};
+    drawText("CREATE WORLD MENU WIP", 80, height_ / 2 - 40, 3, textColor);
+    drawText("CLICK OR ESC TO RETURN", 100, height_ / 2 + 20, 2, textColor);
 }
 
 void Game::drawButton(const Button& button, bool hovered) {
