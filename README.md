@@ -65,3 +65,20 @@ Persistent world state with save/load support and permanent consequences. Option
 - **Language:** C++20 (Windows only)
 - **Engine & Tooling:** SDL2 for windowing/input, OpenGL 3.3 Core Profile for rendering, CMake build system, CLion with Visual Studio toolchain, vcpkg for SDL2.
 - **Visuals:** CP437 bitmap font with simple colored tiles and entities initially, evolving to full tilesets and graphics packs. External dependencies remain minimal.
+
+## Getting Started
+An initial SDL2 prototype is provided to visualize the tile-based playfield grid and exercise the game loop.
+
+### Prerequisites
+- C++20 compiler
+- CMake 3.20+
+- SDL2 development libraries available to your toolchain
+
+### Build & Run
+```bash
+cmake -S . -B build
+cmake --build build
+./build/DungeonDelvers
+```
+
+The prototype opens a resizable window, runs a fixed-step loop, and renders a grid to represent the world tiles while we flesh out dungeon systems.
