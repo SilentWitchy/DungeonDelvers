@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cctype>
 #include <unordered_map>
-#include <utility>
 
 namespace {
 constexpr int TARGET_FPS = 60;
@@ -49,8 +48,7 @@ Game::Game()
     : window_(nullptr),
       renderer_(nullptr),
       width_(0),
-      height_(0),
-      screen_(Screen::MainMenu) {}
+      height_(0) {}
 
 Game::~Game() { shutdown(); }
 
@@ -127,14 +125,7 @@ void Game::processEvents(bool& running) {
             }
         }
 
-        switch (screen_) {
-        case Screen::MainMenu:
-            handleMainMenuEvent(event, running);
-            break;
-        case Screen::CreateWorldPlaceholder:
-            handlePlaceholderEvent(event, running);
-            break;
-        }
+    handleMainMenuEvent(event, running);
     }
 }
 
@@ -148,14 +139,7 @@ void Game::render() {
     SDL_SetRenderDrawColor(renderer_, 20, 16, 24, 255);
     SDL_RenderClear(renderer_);
 
-    switch (screen_) {
-    case Screen::MainMenu:
-        renderMainMenu();
-        break;
-    case Screen::CreateWorldPlaceholder:
-        renderPlaceholder();
-        break;
-    }
+    renderMainMenu();
 
     SDL_RenderPresent(renderer_);
 }
@@ -182,24 +166,9 @@ void Game::handleMainMenuEvent(const SDL_Event& event, bool& running) {
             if (inside) {
                 if (button.label == "QUIT") {
                     running = false;
-                } else if (button.label == "CREATE NEW WORLD") {
-                    screen_ = Screen::CreateWorldPlaceholder;
                 }
             }
         }
-    }
-}
-
-void Game::handlePlaceholderEvent(const SDL_Event& event, bool& running) {
-    if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.sym == SDLK_ESCAPE) {
-            screen_ = Screen::MainMenu;
-        }
-    } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        // Clicking anywhere returns to the main menu for now.
-        screen_ = Screen::MainMenu;
-    } else if (event.type == SDL_QUIT) {
-        running = false;
     }
 }
 
@@ -223,12 +192,15 @@ void Game::renderMainMenu() {
                              mouseY >= button.bounds.y && mouseY <= button.bounds.y + button.bounds.h;
         drawButton(button, hovered);
     }
-}
 
-void Game::renderPlaceholder() {
-    SDL_Color textColor{220, 210, 240, 255};
-    drawText("CREATE WORLD MENU WIP", 80, height_ / 2 - 40, 3, textColor);
-    drawText("CLICK OR ESC TO RETURN", 100, height_ / 2 + 20, 2, textColor);
+    // Temporary notice to indicate other game flows are disabled.
+    SDL_Color noticeColor{180, 170, 200, 255};
+    const std::string noticeText = "MAIN MENU ONLY BUILD";
+    const int noticeScale = 2;
+    const int noticeWidth = static_cast<int>(noticeText.size()) * (5 * noticeScale + 1) - 1;
+    const int noticeX = width_ / 2 - noticeWidth / 2;
+    const int noticeY = height_ - 80;
+    drawText(noticeText, noticeX, noticeY, noticeScale, noticeColor);
 }
 
 void Game::drawButton(const Button& button, bool hovered) {
