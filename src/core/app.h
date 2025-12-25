@@ -57,14 +57,7 @@ namespace dd {
                 SDLContext m_sdl{};
                 Input m_in{};
 
-                Camera m_cam{};
-                Shader m_shader{};
-                Texture m_white{};
-                SpriteBatch m_batch{};
-
                 World m_world{};
-
-                AppMode m_mode = AppMode::Menu;
 
                 int m_activeZ = 0;
                 bool m_running = true;

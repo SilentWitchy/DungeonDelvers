@@ -71,7 +71,7 @@ namespace dd {
     };
 
     static ButtonRect StartButton(float vw, float vh) {
-        const float w = 420.0f;
+        const float w = 240.0f;
         const float h = 60.0f;
         return { (vw - w) * 0.5f, vh * 0.55f, w, h };
     }
@@ -270,7 +270,7 @@ namespace dd {
             RenderText(tx, ty, textScale, label, 0.85f, 0.85f, 0.92f, 1.0f);
         };
 
-        drawButton(start, "Create New World");
+        drawButton(start, "Start");
         drawButton(quit, "Quit");
     }
 
@@ -298,36 +298,6 @@ namespace dd {
         }
 
         // Combat entities are disabled while focusing on world generation.
-    }
-
-    void App::RenderText(float x, float y, float scale, const char* text, float r, float g, float b, float a) {
-        float penX = x;
-        const float penY = y;
-
-        for (size_t i = 0; text[i] != '\0'; ++i) {
-            const Glyph* glyph = LookupGlyph(text[i]);
-            if (!glyph) {
-                penX += 6.0f * scale;
-                continue;
-            }
-
-            if (text[i] == ' ') {
-                penX += 6.0f * scale;
-                continue;
-            }
-
-            for (int row = 0; row < 7; ++row) {
-                const uint8_t bits = glyph->rows[row];
-                for (int col = 0; col < 5; ++col) {
-                    if (bits & (1 << (4 - col))) {
-                        m_batch.PushQuad(penX + col * scale, penY + row * scale, scale, scale, r, g, b, a);
-                    }
-                }
-            }
-
-            penX += 6.0f * scale;
-        }
-    }
 
     Mat4 App::ScreenOrtho() const {
         return Mat4::Ortho(0.0f, m_viewW, m_viewH, 0.0f, -1.0f, 1.0f);
