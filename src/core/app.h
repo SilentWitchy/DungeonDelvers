@@ -15,6 +15,11 @@
 
 namespace dd {
 
+        enum class AppMode {
+                Menu,
+                Playing
+        };
+
 	struct AppConfig final {
 		const char* title = "DungeonDelvers";
 
@@ -35,26 +40,30 @@ namespace dd {
 		explicit App(AppConfig cfg);
 		int Run();
 
-	private:
-		void StepSim();
-		void RenderFrame();
-		void HandleResize(int w, int h);
+        private:
+                void StepSim();
+                void RenderFrame();
+                void HandleResize(int w, int h);
 
-	private:
-		AppConfig m_cfg{};
+                void RenderMenu();
+                void RenderWorld();
+                void RenderText(float x, float y, float scale, const char* text, float r, float g, float b, float a);
+                Mat4 ScreenOrtho() const;
+                bool MenuButtonPressed(float x, float y, float w, float h) const;
 
-		SDLContext m_sdl{};
-		Input m_in{};
+        private:
+                AppConfig m_cfg{};
 
-		Camera m_cam{};
-		Shader m_shader{};
-		Texture m_white{};
-		SpriteBatch m_batch{};
+                SDLContext m_sdl{};
+                Input m_in{};
 
                 World m_world{};
 
-		int m_activeZ = 0;
-		bool m_running = true;
-	};
+                int m_activeZ = 0;
+                bool m_running = true;
+
+                float m_viewW = 0.0f;
+                float m_viewH = 0.0f;
+        };
 
 } // namespace dd

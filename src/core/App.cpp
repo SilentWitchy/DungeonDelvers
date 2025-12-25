@@ -1,6 +1,10 @@
 #include "core/App.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
 #include <string>
 
 #include <SDL.h>
@@ -11,6 +15,74 @@
 namespace dd {
 
     // ---------------------- helpers ----------------------
+
+    struct Glyph {
+        uint8_t rows[7];
+    };
+
+    static constexpr Glyph MakeGlyph(std::initializer_list<uint8_t> rows) {
+        Glyph g{};
+        size_t i = 0;
+        for (uint8_t r : rows) {
+            g.rows[i++] = r;
+        }
+        return g;
+    }
+
+    static const Glyph* LookupGlyph(char c) {
+        static constexpr Glyph SPACE = MakeGlyph({ 0,0,0,0,0,0,0 });
+        static constexpr Glyph A = MakeGlyph({ 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 });
+        static constexpr Glyph D = MakeGlyph({ 0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E });
+        static constexpr Glyph E = MakeGlyph({ 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F });
+        static constexpr Glyph G = MakeGlyph({ 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0E });
+        static constexpr Glyph I = MakeGlyph({ 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E });
+        static constexpr Glyph L = MakeGlyph({ 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F });
+        static constexpr Glyph N = MakeGlyph({ 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 });
+        static constexpr Glyph O = MakeGlyph({ 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E });
+        static constexpr Glyph Q = MakeGlyph({ 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D });
+        static constexpr Glyph R = MakeGlyph({ 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11 });
+        static constexpr Glyph S = MakeGlyph({ 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E });
+        static constexpr Glyph T = MakeGlyph({ 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 });
+        static constexpr Glyph U = MakeGlyph({ 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E });
+        static constexpr Glyph V = MakeGlyph({ 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 });
+
+        switch (std::toupper(static_cast<unsigned char>(c))) {
+        case 'A': return &A;
+        case 'D': return &D;
+        case 'E': return &E;
+        case 'G': return &G;
+        case 'I': return &I;
+        case 'L': return &L;
+        case 'N': return &N;
+        case 'O': return &O;
+        case 'Q': return &Q;
+        case 'R': return &R;
+        case 'S': return &S;
+        case 'T': return &T;
+        case 'U': return &U;
+        case 'V': return &V;
+        case ' ': return &SPACE;
+        default:  return nullptr;
+        }
+    }
+
+    struct ButtonRect {
+        float x, y, w, h;
+    };
+
+    static ButtonRect StartButton(float vw, float vh) {
+        const float w = 240.0f;
+        const float h = 60.0f;
+        return { (vw - w) * 0.5f, vh * 0.55f, w, h };
+    }
+
+    static ButtonRect QuitButton(float vw, float vh) {
+        const float w = 240.0f;
+        const float h = 60.0f;
+        const float startY = vh * 0.55f;
+        const float spacing = 20.0f;
+        return { (vw - w) * 0.5f, startY + h + spacing, w, h };
+    }
 
     static void SetGLDefaults(int w, int h) {
         gl33::Viewport(0, 0, w, h);
@@ -35,6 +107,8 @@ namespace dd {
         }
 
         SetGLDefaults(m_cfg.window_w, m_cfg.window_h);
+        m_viewW = (float)m_cfg.window_w;
+        m_viewH = (float)m_cfg.window_h;
 
         // Camera/render init
         m_cam.SetViewport((float)m_cfg.window_w, (float)m_cfg.window_h);
@@ -88,26 +162,41 @@ namespace dd {
                 m_in.ProcessEvent(e);
             }
 
-            // Camera movement
-            const float camSpeed = 400.0f * float(dt);
-            if (m_in.key_w) m_cam.Move(0, -camSpeed);
-            if (m_in.key_s) m_cam.Move(0, camSpeed);
-            if (m_in.key_a) m_cam.Move(-camSpeed, 0);
-            if (m_in.key_d) m_cam.Move(camSpeed, 0);
+            if (m_mode == AppMode::Menu) {
+                const ButtonRect start = StartButton(m_viewW, m_viewH);
+                const ButtonRect quit = QuitButton(m_viewW, m_viewH);
 
-            if (m_in.key_q) m_cam.ZoomBy(1.02f);
-            if (m_in.key_e) m_cam.ZoomBy(0.98f);
+                if (MenuButtonPressed(start.x, start.y, start.w, start.h)) {
+                    m_mode = AppMode::Playing;
+                }
 
-            // Z controls
-            if (m_in.wheel_y != 0) m_activeZ += m_in.wheel_y;
-            if (m_in.key_pgup) m_activeZ += 1;
-            if (m_in.key_pgdn) m_activeZ -= 1;
+                if (MenuButtonPressed(quit.x, quit.y, quit.w, quit.h)) {
+                    m_running = false;
+                }
 
-            m_activeZ = std::clamp(m_activeZ, m_world.ZMin(), m_world.ZMax());
+                SDL_SetWindowTitle(m_sdl.Window(), "Dungeon Delvers - Menu");
+            } else {
+                // Camera movement
+                const float camSpeed = 400.0f * float(dt);
+                if (m_in.key_w) m_cam.Move(0, -camSpeed);
+                if (m_in.key_s) m_cam.Move(0, camSpeed);
+                if (m_in.key_a) m_cam.Move(-camSpeed, 0);
+                if (m_in.key_d) m_cam.Move(camSpeed, 0);
 
-            {
-                std::string title = std::string(m_cfg.title) + "  |  Z=" + std::to_string(m_activeZ);
-                SDL_SetWindowTitle(m_sdl.Window(), title.c_str());
+                if (m_in.key_q) m_cam.ZoomBy(1.02f);
+                if (m_in.key_e) m_cam.ZoomBy(0.98f);
+
+                // Z controls
+                if (m_in.wheel_y != 0) m_activeZ += m_in.wheel_y;
+                if (m_in.key_pgup) m_activeZ += 1;
+                if (m_in.key_pgdn) m_activeZ -= 1;
+
+                m_activeZ = std::clamp(m_activeZ, m_world.ZMin(), m_world.ZMax());
+
+                {
+                    std::string title = std::string(m_cfg.title) + "  |  Z=" + std::to_string(m_activeZ);
+                    SDL_SetWindowTitle(m_sdl.Window(), title.c_str());
+                }
             }
 
             // Fixed-step sim
@@ -136,15 +225,58 @@ namespace dd {
         gl33::ClearColor(0.08f, 0.08f, 0.10f, 1.0f);
         gl33::Clear(GL_COLOR_BUFFER_BIT);
 
-        const float tile = float(m_cfg.tile_px);
-
         m_shader.Bind();
-        m_shader.SetMat4("u_viewproj", m_cam.ViewProj());
         m_shader.SetInt("u_tex", 0);
 
         m_white.Bind(0);
 
         m_batch.Begin();
+
+        if (m_mode == AppMode::Menu) {
+            RenderMenu();
+        } else {
+            RenderWorld();
+        }
+
+        m_batch.EndAndDraw();
+
+        SDL_GL_SwapWindow(m_sdl.Window());
+    }
+
+    void App::RenderMenu() {
+        m_shader.SetMat4("u_viewproj", ScreenOrtho());
+
+        // Dim background
+        m_batch.PushQuad(0, 0, m_viewW, m_viewH, 0.05f, 0.05f, 0.07f, 1.0f);
+
+        // Title
+        const float titleScale = 6.0f;
+        const float titleWidth = 14.0f * 6.0f * titleScale; // approximate length
+        const float titleX = (m_viewW - titleWidth) * 0.5f;
+        const float titleY = m_viewH * 0.25f;
+        RenderText(titleX, titleY, titleScale, "Dungeon Delvers", 0.85f, 0.85f, 0.92f, 1.0f);
+
+        // Buttons
+        const ButtonRect start = StartButton(m_viewW, m_viewH);
+        const ButtonRect quit = QuitButton(m_viewW, m_viewH);
+
+        const auto drawButton = [this](const ButtonRect& r, const char* label) {
+            m_batch.PushQuad(r.x, r.y, r.w, r.h, 0.18f, 0.20f, 0.24f, 1.0f);
+            m_batch.PushQuad(r.x + 2.0f, r.y + 2.0f, r.w - 4.0f, r.h - 4.0f, 0.12f, 0.13f, 0.16f, 1.0f);
+            const float textScale = 4.0f;
+            const float textWidth = std::strlen(label) * 6.0f * textScale;
+            const float tx = r.x + (r.w - textWidth) * 0.5f;
+            const float ty = r.y + (r.h - 7.0f * textScale) * 0.5f;
+            RenderText(tx, ty, textScale, label, 0.85f, 0.85f, 0.92f, 1.0f);
+        };
+
+        drawButton(start, "Start");
+        drawButton(quit, "Quit");
+    }
+
+    void App::RenderWorld() {
+        const float tile = float(m_cfg.tile_px);
+        m_shader.SetMat4("u_viewproj", m_cam.ViewProj());
 
         // Tiles
         for (int y = 0; y < m_world.SizeY(); ++y) {
@@ -167,13 +299,21 @@ namespace dd {
 
         // Combat entities are disabled while focusing on world generation.
 
-        m_batch.EndAndDraw();
+    Mat4 App::ScreenOrtho() const {
+        return Mat4::Ortho(0.0f, m_viewW, m_viewH, 0.0f, -1.0f, 1.0f);
+    }
 
-        SDL_GL_SwapWindow(m_sdl.Window());
+    bool App::MenuButtonPressed(float x, float y, float w, float h) const {
+        if (!m_in.mouse_left_pressed) return false;
+        const float mx = (float)m_in.mouse_x;
+        const float my = (float)m_in.mouse_y;
+        return mx >= x && mx <= (x + w) && my >= y && my <= (y + h);
     }
 
     void App::HandleResize(int w, int h) {
         m_cam.SetViewport((float)w, (float)h);
+        m_viewW = (float)w;
+        m_viewH = (float)h;
         gl33::Viewport(0, 0, w, h);
     }
 
