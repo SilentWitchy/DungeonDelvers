@@ -12,16 +12,16 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    int exitCode = EXIT_SUCCESS;
     {
         Game game;
         if (!game.initialize("Dungeon Delvers", 1280, 720)) {
-            SDL_Quit();
-            return EXIT_FAILURE;
+            exitCode = EXIT_FAILURE;
+        } else {
+            game.run();
         }
-
-        game.run();
     }
 
     SDL_Quit();
-    return EXIT_SUCCESS;
+    return exitCode;
 }
