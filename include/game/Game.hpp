@@ -1,9 +1,7 @@
 #pragma once
 
 #include <SDL.h>
-#include <array>
 #include <string>
-#include <vector>
 
 class Game {
 public:
