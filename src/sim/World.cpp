@@ -83,23 +83,30 @@ namespace dd {
             }
         }
 
-        // Walls
-        for (int x = cx - houseW / 2; x <= cx + houseW / 2; ++x) {
-            Get(x, cy - houseH / 2, z0).type = TileType::PlankWall;
-            Get(x, cy + houseH / 2, z0).type = TileType::PlankWall;
-        }
-        for (int y = cy - houseH / 2; y <= cy + houseH / 2; ++y) {
-            Get(cx - houseW / 2, y, z0).type = TileType::PlankWall;
-            Get(cx + houseW / 2, y, z0).type = TileType::PlankWall;
-        }
+        // Base stratification using the generated height map
+        for (int y = 0; y < m_sy; ++y) {
+            for (int x = 0; x < m_sx; ++x) {
+                const int surface = surfaceHeights[(size_t)y * (size_t)m_sx + (size_t)x];
+                for (int z = m_zmin; z <= m_zmax; ++z) {
+                    Tile& t = Get(x, y, z);
 
-        // Basement patch (z=-1)
-        const int zb = -1;
-        for (int y = cy - 4; y <= cy + 4; ++y) {
-            for (int x = cx - 6; x <= cx + 6; ++x) {
-                Get(x, y, zb).type = TileType::Soil;
+                    if (z > surface) {
+                        t.type = TileType::Air;
+                    }
+                    else if (z >= std::max(surface - 2, 0)) {
+                        t.type = TileType::Soil; // a few layers of dirt near the surface
+                    }
+                    else if (z >= 0) {
+                        t.type = TileType::Stone; // solid stone above the zero plane when buried by tall hills
+                    }
+                    else {
+                        t.type = TileType::Stone; // deep underground
+                    }
+                }
             }
         }
+
+        // The house set-piece is disabled while focusing on terrain generation.
     }
 
     int World::Idx(int x, int y, int z) const {

@@ -12,10 +12,6 @@
 #include "render/Texture.h"
 
 #include "sim/World.h"
-#include "sim/DungeonCore.h"
-#include "sim/Spawner.h"
-#include "sim/Mob.h"
-#include "sim/Invader.h"
 
 namespace dd {
 
@@ -55,16 +51,7 @@ namespace dd {
 		Texture m_white{};
 		SpriteBatch m_batch{};
 
-		World m_world{};
-		DungeonCore m_core{};
-		std::vector<Spawner> m_spawners{};
-		std::vector<Mob> m_mobs{};
-		std::vector<Invader> m_invaders{};
-
-		std::vector<int> m_dist{}; // BFS distance field
-
-		int m_invader_spawn_ticks = 0;
-		int m_invader_spawn_reset = 90;
+                World m_world{};
 
 		int m_activeZ = 0;
 		bool m_running = true;
