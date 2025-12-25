@@ -83,8 +83,8 @@ namespace dd {
         m_spawners.push_back(Spawner{ m_core.x - 2, m_core.y, 0, "wasps" });
 
         for (auto& s : m_spawners) {
-            s.cooldown_reset = 30;
-            s.cooldown_ticks = 10;
+            s.cooldown_reset = 300;
+            s.cooldown_ticks = 300;
             s.cap = 8;
         }
 
@@ -170,50 +170,102 @@ namespace dd {
             m_dist.assign((size_t)sx * (size_t)sy, -1);
         }
 
-        // ---- 1) Spawn mobs from spawners (minimal) ----
-        auto count_kind_on_z = [&](const Spawner& sp) -> int {
+        // ---- 1) Spawn mobs from spawners (per-spawner cap + safe placement) ----
+
+        // Occupancy test: is (x,y,z) already taken by any mob or invader?
+        auto IsOccupied = [&](int x, int y, int zcheck) -> bool {
+            for (const auto& m : m_mobs) {
+                if (m.z == zcheck && m.x == x && m.y == y) return true;
+            }
+            for (const auto& inv : m_invaders) {
+                if (inv.z == zcheck && inv.x == x && inv.y == y) return true;
+            }
+            return false;
+            };
+
+        // Count ONLY mobs created by this specific spawner id (per-spawner cap).
+        auto CountBySpawner = [&](int spawnerId) -> int {
             int c = 0;
             for (const auto& m : m_mobs) {
-                if (m.z != sp.z) continue;
-                if (sp.kind == "rats" && m.kind == MobKind::Rat) c++;
-                if (sp.kind == "wasps" && m.kind == MobKind::Wasp) c++;
-                if (sp.kind == "ghouls" && m.kind == MobKind::Ghoul) c++;
+                if (m.spawner_id == spawnerId) c++;
             }
             return c;
             };
 
-        auto spawn_mob_near = [&](const Spawner& sp) {
+        // Try to find a valid spawn tile near the spawner:
+        // - in bounds
+        // - walkable tile
+        // - not occupied by any mob/invader
+        auto FindSpawnSpotNear = [&](const Spawner& sp, int spawnerId, int& outX, int& outY) -> bool {
+            // First: try the spawner tile itself
+            if (sp.x >= 0 && sp.x < sx && sp.y >= 0 && sp.y < sy) {
+                if (IsWalkable(m_world.Get(sp.x, sp.y, sp.z).type) && !IsOccupied(sp.x, sp.y, sp.z)) {
+                    outX = sp.x;
+                    outY = sp.y;
+                    return true;
+                }
+            }
+
+            // Then: try a deterministic pattern around it (radius 1..3)
+            // Using a deterministic "seed" keeps behavior stable between runs.
+            const int baseSeed = spawnerId * 10007 + sp.x * 31 + sp.y * 97 + sp.z * 13;
+
+            for (int attempt = 0; attempt < 64; ++attempt) {
+                const int seed = baseSeed + attempt * 37;
+
+                // radius 1..3
+                const int radius = 1 + (seed % 3);
+
+                // offset in [-radius, +radius]
+                const int ox = ((seed / 3) % (radius * 2 + 1)) - radius;
+                const int oy = ((seed / 17) % (radius * 2 + 1)) - radius;
+
+                const int x = sp.x + ox;
+                const int y = sp.y + oy;
+
+                if (x < 0 || x >= sx || y < 0 || y >= sy) continue;
+                if (!IsWalkable(m_world.Get(x, y, sp.z).type)) continue;
+                if (IsOccupied(x, y, sp.z)) continue;
+
+                outX = x;
+                outY = y;
+                return true;
+            }
+
+            return false;
+            };
+
+        auto SpawnMobFromSpawner = [&](const Spawner& sp, int spawnerId) {
             Mob mob{};
             mob.z = sp.z;
+            mob.spawner_id = spawnerId;
 
             if (sp.kind == "rats") { mob.kind = MobKind::Rat; mob.hp = 10; }
             else if (sp.kind == "wasps") { mob.kind = MobKind::Wasp; mob.hp = 6; }
             else { mob.kind = MobKind::Ghoul; mob.hp = 20; }
 
-            bool placed = false;
-            for (int i = 0; i < 12; ++i) {
-                const int seed = int(m_mobs.size()) * 17 + i * 31 + sp.x * 7 + sp.y * 13;
-                const int ox = (seed % 7) - 3;
-                const int oy = ((seed / 7) % 7) - 3;
+            int sxp = sp.x;
+            int syp = sp.y;
 
-                const int x = sp.x + ox;
-                const int y = sp.y + oy;
-                if (x < 0 || x >= sx || y < 0 || y >= sy) continue;
-
-                mob.x = x;
-                mob.y = y;
-                placed = true;
-                break;
+            if (!FindSpawnSpotNear(sp, spawnerId, sxp, syp)) {
+                // No valid spot found: skip spawning this tick.
+                return;
             }
 
-            if (!placed) { mob.x = sp.x; mob.y = sp.y; }
+            mob.x = sxp;
+            mob.y = syp;
             m_mobs.push_back(mob);
             };
 
-        for (auto& sp : m_spawners) {
+        for (int i = 0; i < (int)m_spawners.size(); ++i) {
+            Spawner& sp = m_spawners[(size_t)i];
+
             if (sp.cooldown_ticks > 0) sp.cooldown_ticks--;
+
             if (sp.cooldown_ticks <= 0) {
-                if (count_kind_on_z(sp) < sp.cap) spawn_mob_near(sp);
+                if (CountBySpawner(i) < sp.cap) {
+                    SpawnMobFromSpawner(sp, i);
+                }
                 sp.cooldown_ticks = sp.cooldown_reset;
             }
         }
@@ -227,6 +279,11 @@ namespace dd {
             inv.hp = 20;
             inv.move_reset = 6;
             inv.move_cooldown = 0;
+
+            // Core attack settings (can be varied by invader type later)
+            inv.atk_reset = 30;   // 1 second
+            inv.atk_cooldown = 15; // first hit after 0.5s
+            inv.atk_damage = 5;
 
             const int seed = (int)m_invaders.size() * 101 + m_core.x * 17 + m_core.y * 29;
             const int edge = seed % 4;
@@ -321,6 +378,37 @@ namespace dd {
             inv.x = bestX;
             inv.y = bestY;
             inv.move_cooldown = inv.move_reset;
+        }
+        // ---- 5) Invaders attack the core if they are on it ----
+        for (auto& inv : m_invaders) {
+            if (inv.z != m_core.z) continue;
+
+            // Only attack if standing on the core tile
+            if (inv.x == m_core.x && inv.y == m_core.y) {
+                if (inv.atk_cooldown > 0) {
+                    inv.atk_cooldown--;
+                }
+                else {
+                    m_core.hp -= inv.atk_damage;
+                    if (m_core.hp < 0) m_core.hp = 0;
+
+                    // Reset attack timer
+                    inv.atk_cooldown = inv.atk_reset;
+
+                    // Optional: quick feedback in console
+                    dd::LogInfo("Core hit! HP = " + std::to_string(m_core.hp));
+                }
+            }
+            else {
+                // If not on core, let them "ready" their next hit naturally
+                if (inv.atk_cooldown > 0) inv.atk_cooldown--;
+            }
+        }
+
+        // Lose condition
+        if (m_core.hp <= 0) {
+            dd::LogError("CORE DESTROYED. DungeonDelvers: Game Over.");
+            m_running = false;
         }
     }
 
