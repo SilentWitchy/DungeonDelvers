@@ -1,5 +1,3 @@
-# Dungeon Delvers
-
 Dungeon Delvers is a Dwarf Fortress–inspired simulation game where you play as a sentient dungeon core, expand your underground domain, and interact with a living world of cities, factions, adventurers, and rival dungeons.
 
 ## Core Gameplay Pillars
